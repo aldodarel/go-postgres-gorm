@@ -113,12 +113,62 @@ func (r *Repository) GetBookByID(context *fiber.Ctx) error {
 	return nil
 }
 
+// Add update operation
+func (r *Repository) UpdateBook(context *fiber.Ctx) error {
+    book := Book{}
+
+    err := context.BodyParser(&book)
+    if err != nil {
+        context.Status(http.StatusUnprocessableEntity).JSON(
+            &fiber.Map{"message": "request failed"})
+        return err
+    }
+
+    id := context.Params("id")
+    if id == "" {
+        context.Status(http.StatusInternalServerError).JSON(&fiber.Map{
+            "message": "id cannot be empty",
+        })
+        return nil
+    }
+
+    var existingBook models.Books
+    result := r.DB.First(&existingBook, id)
+    if result.Error != nil {
+        context.Status(http.StatusNotFound).JSON(&fiber.Map{
+            "message": "book not found",
+        })
+        return result.Error
+    }
+
+    // Update fields
+    existingBook.Author = &book.Author
+    existingBook.Title = &book.Title
+    existingBook.Publisher = &book.Publisher
+
+    // Save the updated book
+    result = r.DB.Save(&existingBook)
+    if result.Error != nil {
+        context.Status(http.StatusInternalServerError).JSON(&fiber.Map{
+            "message": "could not update book",
+        })
+        return result.Error
+    }
+
+    context.Status(http.StatusOK).JSON(&fiber.Map{
+        "message": "book updated successfully",
+    })
+    return nil
+}
+
+
 func (r *Repository) SetupRoutes(app *fiber.App) {
 	api := app.Group("/api")
 	api.Post("/create_books", r.CreateBook)
 	api.Delete("delete_book/:id", r.DeleteBook)
 	api.Get("/get_books/:id", r.GetBookByID)
 	api.Get("/books", r.GetBooks)
+	api.Put("/update_book/:id", r.UpdateBook) // New route for updating a book
 }
 
 func main() {
